@@ -80,31 +80,49 @@ func (m *Mux) wrap(handle Handle) httprouter.Handle {
 }
 
 // Handle by method and path.
-func (m *Mux) Handle(method, path string, handle Handle) { m.r.Handle(method, path, m.wrap(handle)) }
+func (m *Mux) Handle(method, path string, handle Handle) {
+	m.r.Handle(method, path, m.wrap(handle))
+}
 
 // HEAD methods at path.
-func (m *Mux) HEAD(path string, handle Handle) { m.r.HEAD(path, m.wrap(handle)) }
+func (m *Mux) HEAD(path string, handle Handle) {
+	m.r.HEAD(path, m.wrap(handle))
+}
 
 // GET methods at path.
-func (m *Mux) GET(path string, handle Handle) { m.r.GET(path, m.wrap(handle)) }
+func (m *Mux) GET(path string, handle Handle) {
+	m.r.GET(path, m.wrap(handle))
+}
 
 // POST methods at path.
-func (m *Mux) POST(path string, handle Handle) { m.r.POST(path, m.wrap(handle)) }
+func (m *Mux) POST(path string, handle Handle) {
+	m.r.POST(path, m.wrap(handle))
+}
 
 // PUT methods at path.
-func (m *Mux) PUT(path string, handle Handle) { m.r.PUT(path, m.wrap(handle)) }
+func (m *Mux) PUT(path string, handle Handle) {
+	m.r.PUT(path, m.wrap(handle))
+}
 
 // DELETE methods at path.
-func (m *Mux) DELETE(path string, handle Handle) { m.r.DELETE(path, m.wrap(handle)) }
+func (m *Mux) DELETE(path string, handle Handle) {
+	m.r.DELETE(path, m.wrap(handle))
+}
 
 // PATCH methods at path.
-func (m *Mux) PATCH(path string, handle Handle) { m.r.PATCH(path, m.wrap(handle)) }
+func (m *Mux) PATCH(path string, handle Handle) {
+	m.r.PATCH(path, m.wrap(handle))
+}
 
 // ServeHTTP allows Mux to be used as a http.Handler.
-func (m *Mux) ServeHTTP(w http.ResponseWriter, req *http.Request) { m.r.ServeHTTP(w, req) }
+func (m *Mux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	m.r.ServeHTTP(w, req)
+}
 
 // Handler allows for registering a http.Handler.
-func (m *Mux) Handler(method, path string, handler http.Handler) { m.r.Handler(method, path, handler) }
+func (m *Mux) Handler(method, path string, handler http.Handler) {
+	m.r.Handler(method, path, handler)
+}
 
 // HandlerFunc allows for registering a http.HandlerFunc.
 func (m *Mux) HandlerFunc(method, path string, handler http.HandlerFunc) {
