@@ -56,7 +56,7 @@ type Handler func(ctx context.Context, w http.ResponseWriter, r *http.Request) e
 type Mux struct {
 	contextMaker func(*http.Request) (context.Context, error)
 	errorHandler func(context.Context, http.ResponseWriter, *http.Request, error)
-	panicHandler PanicHandler
+	panicHandler func(context.Context, http.ResponseWriter, *http.Request, interface{})
 	r            httprouter.Router
 }
 
@@ -160,14 +160,10 @@ func MuxErrorHandler(handler func(context.Context, http.ResponseWriter, *http.Re
 	}
 }
 
-// PanicHandler is invoked with the panics that occur during context creation
-// or while the handler is running.
-type PanicHandler func(context.Context, http.ResponseWriter, *http.Request, interface{})
-
-// MuxPanicHandler configures the panic handler for the Mux. If one is not
-// configured, the default behavior is what the net/http package does; which is
-// to print a trace and ignore it.
-func MuxPanicHandler(handler PanicHandler) MuxOption {
+// MuxPanicHandler configures a function which is invoked for panics raised
+// while serving a request. If one is not configured, the default behavior is
+// what the net/http package does; which is to print a trace and ignore it.
+func MuxPanicHandler(handler func(context.Context, http.ResponseWriter, *http.Request, interface{})) MuxOption {
 	return func(m *Mux) error {
 		m.panicHandler = handler
 		return nil
