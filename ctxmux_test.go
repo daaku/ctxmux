@@ -63,12 +63,13 @@ func TestWrapMethods(t *testing.T) {
 	const val = int(2)
 	body := []byte("body")
 	for _, c := range cases {
-		mux := ctxmux.Mux{
-			ContextPipe: ctxmux.ContextPipeChain(
+		mux, err := ctxmux.New(
+			ctxmux.MuxContextPipe(ctxmux.ContextPipeChain(
 				func(ctx context.Context, r *http.Request) (context.Context, error) {
 					return context.WithValue(ctx, key, val), nil
-				}),
-		}
+				})),
+		)
+		ensure.Nil(t, err)
 		hw := httptest.NewRecorder()
 		hr := &http.Request{
 			Method: c.Method,
@@ -76,7 +77,7 @@ func TestWrapMethods(t *testing.T) {
 				Path: "/",
 			},
 		}
-		c.Register(&mux, hr.URL.Path, func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+		c.Register(mux, hr.URL.Path, func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 			ensure.DeepEqual(t, ctx.Value(key), val)
 			w.Write(body)
 			return nil
@@ -89,14 +90,17 @@ func TestWrapMethods(t *testing.T) {
 func TestMuxContextPipeError(t *testing.T) {
 	givenErr := errors.New("")
 	var actualErr error
-	mux := ctxmux.Mux{
-		ContextPipe: func(context.Context, *http.Request) (context.Context, error) {
-			return nil, givenErr
-		},
-		ErrorHandler: func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
-			actualErr = err
-		},
-	}
+	mux, err := ctxmux.New(
+		ctxmux.MuxContextPipe(ctxmux.ContextPipeChain(
+			func(ctx context.Context, r *http.Request) (context.Context, error) {
+				return nil, givenErr
+			})),
+		ctxmux.MuxErrorHandler(
+			func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
+				actualErr = err
+			}),
+	)
+	ensure.Nil(t, err)
 	hw := httptest.NewRecorder()
 	hr := &http.Request{
 		Method: "GET",
@@ -112,7 +116,8 @@ func TestMuxContextPipeError(t *testing.T) {
 }
 
 func TestHandleCustomMethod(t *testing.T) {
-	var mux ctxmux.Mux
+	mux, err := ctxmux.New()
+	ensure.Nil(t, err)
 	const method = "FOO"
 	body := []byte("body")
 	hw := httptest.NewRecorder()
@@ -131,7 +136,8 @@ func TestHandleCustomMethod(t *testing.T) {
 }
 
 func TestHTTPHandler(t *testing.T) {
-	var mux ctxmux.Mux
+	mux, err := ctxmux.New()
+	ensure.Nil(t, err)
 	const method = "FOO"
 	body := []byte("body")
 	hw := httptest.NewRecorder()
@@ -152,7 +158,8 @@ func TestHTTPHandler(t *testing.T) {
 }
 
 func TestHTTPHandlerFunc(t *testing.T) {
-	var mux ctxmux.Mux
+	mux, err := ctxmux.New()
+	ensure.Nil(t, err)
 	const method = "FOO"
 	body := []byte("body")
 	hw := httptest.NewRecorder()
@@ -173,11 +180,13 @@ func TestHTTPHandlerFunc(t *testing.T) {
 func TestHandleReturnErr(t *testing.T) {
 	givenErr := errors.New("")
 	var actualErr error
-	mux := ctxmux.Mux{
-		ErrorHandler: func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
-			actualErr = err
-		},
-	}
+	mux, err := ctxmux.New(
+		ctxmux.MuxErrorHandler(
+			func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
+				actualErr = err
+			}),
+	)
+	ensure.Nil(t, err)
 	hw := httptest.NewRecorder()
 	hr := &http.Request{
 		Method: "GET",

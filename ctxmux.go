@@ -55,25 +55,25 @@ func ContextPipeChain(pipes ...ContextPipe) ContextPipe {
 
 // Mux provides shared context initialization and error handling.
 type Mux struct {
-	ContextPipe  ContextPipe
-	ErrorHandler func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error)
+	contextPipe  ContextPipe
+	errorHandler func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error)
 	r            httprouter.Router
 }
 
 func (m *Mux) wrap(handle Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		ctx := WithParams(context.Background(), p)
-		if m.ContextPipe != nil {
-			ctxNew, err := m.ContextPipe(ctx, r)
+		if m.contextPipe != nil {
+			ctxNew, err := m.contextPipe(ctx, r)
 			if err != nil {
-				m.ErrorHandler(ctx, w, r, err)
+				m.errorHandler(ctx, w, r, err)
 				return
 			}
 			ctx = ctxNew
 		}
 
 		if err := handle(ctx, w, r); err != nil {
-			m.ErrorHandler(ctx, w, r, err)
+			m.errorHandler(ctx, w, r, err)
 			return
 		}
 	}
@@ -127,4 +127,56 @@ func (m *Mux) Handler(method, path string, handler http.Handler) {
 // HandlerFunc allows for registering a http.HandlerFunc.
 func (m *Mux) HandlerFunc(method, path string, handler http.HandlerFunc) {
 	m.r.HandlerFunc(method, path, handler)
+}
+
+// MuxOption are used to set various mux options.
+type MuxOption func(*Mux) error
+
+// MuxContextPipe sets the ContextPipe function on the Mux. The default context
+// is context.Background().
+func MuxContextPipe(pipe ContextPipe) MuxOption {
+	return func(m *Mux) error {
+		m.contextPipe = pipe
+		return nil
+	}
+}
+
+// ErrorHandler is invoked with errors returned by handler functions.
+type ErrorHandler func(context.Context, http.ResponseWriter, *http.Request, error)
+
+// MuxErrorHandler configures the ErrorHandler for the Mux. If one isn't set,
+// the default behaviour is to log it and send a static error message of
+// "internal server error".
+func MuxErrorHandler(handler ErrorHandler) MuxOption {
+	return func(m *Mux) error {
+		m.errorHandler = handler
+		return nil
+	}
+}
+
+// PanicHandler is invoked with the panics that occur during context creation
+// or while the handler is running.
+//
+// TODO: Should also be passed the context.Context.
+type PanicHandler func(http.ResponseWriter, *http.Request, interface{})
+
+// MuxPanicHandler configures the panic handler for the Mux. If one is not
+// configured, the default behavior is what the net/http package does; which is
+// to print a trace and ignore it.
+func MuxPanicHandler(handler PanicHandler) MuxOption {
+	return func(m *Mux) error {
+		m.r.PanicHandler = handler
+		return nil
+	}
+}
+
+// New creates a new Mux and configures it with the given options.
+func New(options ...MuxOption) (*Mux, error) {
+	var m Mux
+	for _, o := range options {
+		if err := o(&m); err != nil {
+			return nil, err
+		}
+	}
+	return &m, nil
 }
