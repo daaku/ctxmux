@@ -83,7 +83,7 @@ func (m *Mux) wrap(handler Handler) httprouter.Handle {
 
 		if m.panicHandler != nil {
 			defer func() {
-				if v := recover(); r != nil {
+				if v := recover(); v != nil {
 					m.panicHandler(ctx, w, r, v)
 				}
 			}()
@@ -181,6 +181,18 @@ type PanicHandler func(context.Context, http.ResponseWriter, *http.Request, inte
 func MuxPanicHandler(handler PanicHandler) MuxOption {
 	return func(m *Mux) error {
 		m.panicHandler = handler
+		return nil
+	}
+}
+
+// MuxNotFoundHandler configures a Handler that is invoked for requests where
+// one isn't found.
+func MuxNotFoundHandler(handler Handler) MuxOption {
+	return func(m *Mux) error {
+		h := m.wrap(handler)
+		m.r.NotFound = func(w http.ResponseWriter, r *http.Request) {
+			h(w, r, nil)
+		}
 		return nil
 	}
 }

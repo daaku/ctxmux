@@ -221,3 +221,45 @@ func TestHandlerPanic(t *testing.T) {
 	mux.ServeHTTP(hw, hr)
 	ensure.DeepEqual(t, actualPanic, givenPanic)
 }
+
+func TestHandlerNoPanic(t *testing.T) {
+	mux, err := ctxmux.New(
+		ctxmux.MuxPanicHandler(
+			func(ctx context.Context, w http.ResponseWriter, r *http.Request, v interface{}) {
+				panic("not reached")
+			}),
+	)
+	ensure.Nil(t, err)
+	hw := httptest.NewRecorder()
+	hr := &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			Path: "/",
+		},
+	}
+	mux.GET(hr.URL.Path, func(context.Context, http.ResponseWriter, *http.Request) error {
+		return nil
+	})
+	mux.ServeHTTP(hw, hr)
+}
+
+func TestHandlerNotFound(t *testing.T) {
+	var called bool
+	mux, err := ctxmux.New(
+		ctxmux.MuxNotFoundHandler(
+			func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+				called = true
+				return nil
+			}),
+	)
+	ensure.Nil(t, err)
+	hw := httptest.NewRecorder()
+	hr := &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			Path: "/",
+		},
+	}
+	mux.ServeHTTP(hw, hr)
+	ensure.True(t, called)
+}
