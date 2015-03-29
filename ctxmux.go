@@ -52,34 +52,34 @@ func HTTPHandlerFunc(handler http.HandlerFunc) Handler {
 // Handler is an augmented http.Handler.
 type Handler func(ctx context.Context, w http.ResponseWriter, r *http.Request) error
 
-// ContextPipe pipes a context through, possibly adding something to it.
-type ContextPipe func(ctx context.Context, r *http.Request) (context.Context, error)
-
-// ContextPipeChain chains a series of ContextPipe.
-func ContextPipeChain(pipes ...ContextPipe) ContextPipe {
-	return func(ctx context.Context, r *http.Request) (context.Context, error) {
-		for _, p := range pipes {
-			ctxNew, err := p(ctx, r)
-			if err != nil {
-				return ctx, err
-			}
-			ctx = ctxNew
-		}
-		return ctx, nil
-	}
-}
+// ContextMaker creates a new context for the given request. If it returns an
+// error, it will be passed to the ErrorHandler. Since the ErrorHandler also
+// expects a context, in this case a default of context.Background() will be
+// used.
+type ContextMaker func(r *http.Request) (context.Context, error)
 
 // Mux provides shared context initialization and error handling.
 type Mux struct {
-	contextPipe  ContextPipe
+	contextMaker ContextMaker
 	errorHandler ErrorHandler
 	panicHandler PanicHandler
 	r            httprouter.Router
 }
 
+func (m *Mux) makeContext(r *http.Request) (context.Context, error) {
+	if m.contextMaker != nil {
+		ctx, err := m.contextMaker(r)
+		if err != nil {
+			return context.Background(), err
+		}
+		return ctx, nil
+	}
+	return context.Background(), nil
+}
+
 func (m *Mux) wrap(handler Handler) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		ctx := context.Background()
+		var ctx context.Context // so the panicHandler can get to it
 
 		if m.panicHandler != nil {
 			defer func() {
@@ -89,15 +89,12 @@ func (m *Mux) wrap(handler Handler) httprouter.Handle {
 			}()
 		}
 
-		ctx = WithParams(ctx, p)
-		if m.contextPipe != nil {
-			ctxNew, err := m.contextPipe(ctx, r)
-			if err != nil {
-				m.errorHandler(ctx, w, r, err)
-				return
-			}
-			ctx = ctxNew
+		ctx, err := m.makeContext(r)
+		if err != nil {
+			m.errorHandler(ctx, w, r, err)
+			return
 		}
+		ctx = WithParams(ctx, p)
 
 		if err := handler(ctx, w, r); err != nil {
 			m.errorHandler(ctx, w, r, err)
@@ -149,11 +146,11 @@ func (m *Mux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // MuxOption are used to set various mux options.
 type MuxOption func(*Mux) error
 
-// MuxContextPipe sets the ContextPipe function on the Mux. The default context
-// is context.Background().
-func MuxContextPipe(pipe ContextPipe) MuxOption {
+// MuxContextMaker sets the ContextMaker function for the Mux. The default
+// context is context.Background().
+func MuxContextMaker(f ContextMaker) MuxOption {
 	return func(m *Mux) error {
-		m.contextPipe = pipe
+		m.contextMaker = f
 		return nil
 	}
 }
