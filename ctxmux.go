@@ -52,15 +52,9 @@ func HTTPHandlerFunc(handler http.HandlerFunc) Handler {
 // Handler is an augmented http.Handler.
 type Handler func(ctx context.Context, w http.ResponseWriter, r *http.Request) error
 
-// ContextMaker creates a new context for the given request. If it returns an
-// error, it will be passed to the ErrorHandler. Since the ErrorHandler also
-// expects a context, in this case a default of context.Background() will be
-// used.
-type ContextMaker func(r *http.Request) (context.Context, error)
-
 // Mux provides shared context initialization and error handling.
 type Mux struct {
-	contextMaker ContextMaker
+	contextMaker func(*http.Request) (context.Context, error)
 	errorHandler ErrorHandler
 	panicHandler PanicHandler
 	r            httprouter.Router
@@ -146,9 +140,10 @@ func (m *Mux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // MuxOption are used to set various mux options.
 type MuxOption func(*Mux) error
 
-// MuxContextMaker sets the ContextMaker function for the Mux. The default
-// context is context.Background().
-func MuxContextMaker(f ContextMaker) MuxOption {
+// MuxContextMaker sets a function to create the context for each request. The
+// default context is context.Background(). If the assigned function returns an
+// error, it will be passed to the ErrorHandler.
+func MuxContextMaker(f func(*http.Request) (context.Context, error)) MuxOption {
 	return func(m *Mux) error {
 		m.contextMaker = f
 		return nil
