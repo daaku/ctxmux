@@ -34,17 +34,17 @@ func ContextParams(ctx context.Context) httprouter.Params {
 }
 
 // HTTPHandler calls the underlying http.Handler.
-func HTTPHandler(handler http.Handler) Handler {
+func HTTPHandler(h http.Handler) Handler {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-		handler.ServeHTTP(w, r)
+		h.ServeHTTP(w, r)
 		return nil
 	}
 }
 
 // HTTPHandlerFunc calls the underlying http.HandlerFunc.
-func HTTPHandlerFunc(handler http.HandlerFunc) Handler {
+func HTTPHandlerFunc(h http.HandlerFunc) Handler {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-		handler(w, r)
+		h(w, r)
 		return nil
 	}
 }
@@ -71,7 +71,7 @@ func (m *Mux) makeContext(r *http.Request) (context.Context, error) {
 	return context.Background(), nil
 }
 
-func (m *Mux) wrap(handler Handler) httprouter.Handle {
+func (m *Mux) wrap(h Handler) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		var ctx context.Context // so the panicHandler can get to it
 
@@ -90,7 +90,7 @@ func (m *Mux) wrap(handler Handler) httprouter.Handle {
 		}
 		ctx = WithParams(ctx, p)
 
-		if err := handler(ctx, w, r); err != nil {
+		if err := h(ctx, w, r); err != nil {
 			m.errorHandler(ctx, w, r, err)
 			return
 		}
@@ -98,38 +98,38 @@ func (m *Mux) wrap(handler Handler) httprouter.Handle {
 }
 
 // Handler by method and path.
-func (m *Mux) Handler(method, path string, handler Handler) {
-	m.r.Handle(method, path, m.wrap(handler))
+func (m *Mux) Handler(method, path string, h Handler) {
+	m.r.Handle(method, path, m.wrap(h))
 }
 
 // HEAD methods at path.
-func (m *Mux) HEAD(path string, handler Handler) {
-	m.r.HEAD(path, m.wrap(handler))
+func (m *Mux) HEAD(path string, h Handler) {
+	m.r.HEAD(path, m.wrap(h))
 }
 
 // GET methods at path.
-func (m *Mux) GET(path string, handler Handler) {
-	m.r.GET(path, m.wrap(handler))
+func (m *Mux) GET(path string, h Handler) {
+	m.r.GET(path, m.wrap(h))
 }
 
 // POST methods at path.
-func (m *Mux) POST(path string, handler Handler) {
-	m.r.POST(path, m.wrap(handler))
+func (m *Mux) POST(path string, h Handler) {
+	m.r.POST(path, m.wrap(h))
 }
 
 // PUT methods at path.
-func (m *Mux) PUT(path string, handler Handler) {
-	m.r.PUT(path, m.wrap(handler))
+func (m *Mux) PUT(path string, h Handler) {
+	m.r.PUT(path, m.wrap(h))
 }
 
 // DELETE methods at path.
-func (m *Mux) DELETE(path string, handler Handler) {
-	m.r.DELETE(path, m.wrap(handler))
+func (m *Mux) DELETE(path string, h Handler) {
+	m.r.DELETE(path, m.wrap(h))
 }
 
 // PATCH methods at path.
-func (m *Mux) PATCH(path string, handler Handler) {
-	m.r.PATCH(path, m.wrap(handler))
+func (m *Mux) PATCH(path string, h Handler) {
+	m.r.PATCH(path, m.wrap(h))
 }
 
 // ServeHTTP allows Mux to be used as a http.Handler.
@@ -153,9 +153,9 @@ func MuxContextMaker(f func(*http.Request) (context.Context, error)) MuxOption {
 // MuxErrorHandler configures a function which is invoked for errors returned
 // by a Handler. If one isn't set, the default behaviour is to log it and send
 // a static error message of "internal server error".
-func MuxErrorHandler(handler func(context.Context, http.ResponseWriter, *http.Request, error)) MuxOption {
+func MuxErrorHandler(h func(context.Context, http.ResponseWriter, *http.Request, error)) MuxOption {
 	return func(m *Mux) error {
-		m.errorHandler = handler
+		m.errorHandler = h
 		return nil
 	}
 }
@@ -163,18 +163,18 @@ func MuxErrorHandler(handler func(context.Context, http.ResponseWriter, *http.Re
 // MuxPanicHandler configures a function which is invoked for panics raised
 // while serving a request. If one is not configured, the default behavior is
 // what the net/http package does; which is to print a trace and ignore it.
-func MuxPanicHandler(handler func(context.Context, http.ResponseWriter, *http.Request, interface{})) MuxOption {
+func MuxPanicHandler(h func(context.Context, http.ResponseWriter, *http.Request, interface{})) MuxOption {
 	return func(m *Mux) error {
-		m.panicHandler = handler
+		m.panicHandler = h
 		return nil
 	}
 }
 
 // MuxNotFoundHandler configures a Handler that is invoked for requests where
 // one isn't found.
-func MuxNotFoundHandler(handler Handler) MuxOption {
+func MuxNotFoundHandler(h Handler) MuxOption {
 	return func(m *Mux) error {
-		h := m.wrap(handler)
+		h := m.wrap(h)
 		m.r.NotFound = func(w http.ResponseWriter, r *http.Request) {
 			h(w, r, nil)
 		}
