@@ -75,6 +75,17 @@ func TestContextPipeChainFailure(t *testing.T) {
 	ensure.DeepEqual(t, err, givenErr)
 }
 
+func TestNewError(t *testing.T) {
+	givenErr := errors.New("")
+	mux, err := ctxmux.New(
+		func(*ctxmux.Mux) error {
+			return givenErr
+		},
+	)
+	ensure.True(t, mux == nil)
+	ensure.DeepEqual(t, err, givenErr)
+}
+
 func TestWrapMethods(t *testing.T) {
 	cases := []struct {
 		Method   string
@@ -163,7 +174,7 @@ func TestHandleCustomMethod(t *testing.T) {
 	ensure.DeepEqual(t, hw.Body.Bytes(), body)
 }
 
-func TestHandleReturnErr(t *testing.T) {
+func TestHandlerReturnErr(t *testing.T) {
 	givenErr := errors.New("")
 	var actualErr error
 	mux, err := ctxmux.New(
@@ -185,4 +196,28 @@ func TestHandleReturnErr(t *testing.T) {
 	})
 	mux.ServeHTTP(hw, hr)
 	ensure.DeepEqual(t, actualErr, givenErr)
+}
+
+func TestHandlerPanic(t *testing.T) {
+	var actualPanic interface{}
+	mux, err := ctxmux.New(
+		ctxmux.MuxPanicHandler(
+			func(ctx context.Context, w http.ResponseWriter, r *http.Request, v interface{}) {
+				actualPanic = v
+			}),
+	)
+	ensure.Nil(t, err)
+	hw := httptest.NewRecorder()
+	hr := &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			Path: "/",
+		},
+	}
+	givenPanic := int(42)
+	mux.GET(hr.URL.Path, func(context.Context, http.ResponseWriter, *http.Request) error {
+		panic(givenPanic)
+	})
+	mux.ServeHTTP(hw, hr)
+	ensure.DeepEqual(t, actualPanic, givenPanic)
 }
