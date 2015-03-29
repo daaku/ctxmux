@@ -33,8 +33,24 @@ func ContextParams(ctx context.Context) httprouter.Params {
 	return p
 }
 
-// Handle is an augmented http.Handler.
-type Handle func(ctx context.Context, w http.ResponseWriter, r *http.Request) error
+// HTTPHandler calls the underlying http.Handler.
+func HTTPHandler(handler http.Handler) Handler {
+	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+		handler.ServeHTTP(w, r)
+		return nil
+	}
+}
+
+// HTTPHandlerFunc calls the underlying http.HandlerFunc.
+func HTTPHandlerFunc(handler http.HandlerFunc) Handler {
+	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+		handler(w, r)
+		return nil
+	}
+}
+
+// Handler is an augmented http.Handler.
+type Handler func(ctx context.Context, w http.ResponseWriter, r *http.Request) error
 
 // ContextPipe pipes a context through, possibly adding something to it.
 type ContextPipe func(ctx context.Context, r *http.Request) (context.Context, error)
@@ -60,7 +76,7 @@ type Mux struct {
 	r            httprouter.Router
 }
 
-func (m *Mux) wrap(handle Handle) httprouter.Handle {
+func (m *Mux) wrap(handler Handler) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		ctx := WithParams(context.Background(), p)
 		if m.contextPipe != nil {
@@ -72,61 +88,51 @@ func (m *Mux) wrap(handle Handle) httprouter.Handle {
 			ctx = ctxNew
 		}
 
-		if err := handle(ctx, w, r); err != nil {
+		if err := handler(ctx, w, r); err != nil {
 			m.errorHandler(ctx, w, r, err)
 			return
 		}
 	}
 }
 
-// Handle by method and path.
-func (m *Mux) Handle(method, path string, handle Handle) {
-	m.r.Handle(method, path, m.wrap(handle))
+// Handler by method and path.
+func (m *Mux) Handler(method, path string, handler Handler) {
+	m.r.Handle(method, path, m.wrap(handler))
 }
 
 // HEAD methods at path.
-func (m *Mux) HEAD(path string, handle Handle) {
-	m.r.HEAD(path, m.wrap(handle))
+func (m *Mux) HEAD(path string, handler Handler) {
+	m.r.HEAD(path, m.wrap(handler))
 }
 
 // GET methods at path.
-func (m *Mux) GET(path string, handle Handle) {
-	m.r.GET(path, m.wrap(handle))
+func (m *Mux) GET(path string, handler Handler) {
+	m.r.GET(path, m.wrap(handler))
 }
 
 // POST methods at path.
-func (m *Mux) POST(path string, handle Handle) {
-	m.r.POST(path, m.wrap(handle))
+func (m *Mux) POST(path string, handler Handler) {
+	m.r.POST(path, m.wrap(handler))
 }
 
 // PUT methods at path.
-func (m *Mux) PUT(path string, handle Handle) {
-	m.r.PUT(path, m.wrap(handle))
+func (m *Mux) PUT(path string, handler Handler) {
+	m.r.PUT(path, m.wrap(handler))
 }
 
 // DELETE methods at path.
-func (m *Mux) DELETE(path string, handle Handle) {
-	m.r.DELETE(path, m.wrap(handle))
+func (m *Mux) DELETE(path string, handler Handler) {
+	m.r.DELETE(path, m.wrap(handler))
 }
 
 // PATCH methods at path.
-func (m *Mux) PATCH(path string, handle Handle) {
-	m.r.PATCH(path, m.wrap(handle))
+func (m *Mux) PATCH(path string, handler Handler) {
+	m.r.PATCH(path, m.wrap(handler))
 }
 
 // ServeHTTP allows Mux to be used as a http.Handler.
 func (m *Mux) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	m.r.ServeHTTP(w, req)
-}
-
-// Handler allows for registering a http.Handler.
-func (m *Mux) Handler(method, path string, handler http.Handler) {
-	m.r.Handler(method, path, handler)
-}
-
-// HandlerFunc allows for registering a http.HandlerFunc.
-func (m *Mux) HandlerFunc(method, path string, handler http.HandlerFunc) {
-	m.r.HandlerFunc(method, path, handler)
 }
 
 // MuxOption are used to set various mux options.

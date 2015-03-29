@@ -25,6 +25,34 @@ func TestContextWithFromParams(t *testing.T) {
 	ensure.DeepEqual(t, actual, p)
 }
 
+func TestHTTPHandler(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := &http.Request{}
+	var actualW http.ResponseWriter
+	var actualR *http.Request
+	h := ctxmux.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actualW = w
+		actualR = r
+	}))
+	ensure.Nil(t, h(nil, w, r))
+	ensure.DeepEqual(t, actualW, w)
+	ensure.DeepEqual(t, actualR, r)
+}
+
+func TestHTTPHandlerFunc(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := &http.Request{}
+	var actualW http.ResponseWriter
+	var actualR *http.Request
+	h := ctxmux.HTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		actualW = w
+		actualR = r
+	})
+	ensure.Nil(t, h(nil, w, r))
+	ensure.DeepEqual(t, actualW, w)
+	ensure.DeepEqual(t, actualR, r)
+}
+
 func TestContextPipeChainSuccess(t *testing.T) {
 	const key = int(1)
 	const val = int(2)
@@ -50,7 +78,7 @@ func TestContextPipeChainFailure(t *testing.T) {
 func TestWrapMethods(t *testing.T) {
 	cases := []struct {
 		Method   string
-		Register func(*ctxmux.Mux, string, ctxmux.Handle)
+		Register func(*ctxmux.Mux, string, ctxmux.Handler)
 	}{
 		{Method: "HEAD", Register: (*ctxmux.Mux).HEAD},
 		{Method: "GET", Register: (*ctxmux.Mux).GET},
@@ -127,52 +155,10 @@ func TestHandleCustomMethod(t *testing.T) {
 			Path: "/",
 		},
 	}
-	mux.Handle(method, hr.URL.Path, func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	mux.Handler(method, hr.URL.Path, func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 		w.Write(body)
 		return nil
 	})
-	mux.ServeHTTP(hw, hr)
-	ensure.DeepEqual(t, hw.Body.Bytes(), body)
-}
-
-func TestHTTPHandler(t *testing.T) {
-	mux, err := ctxmux.New()
-	ensure.Nil(t, err)
-	const method = "FOO"
-	body := []byte("body")
-	hw := httptest.NewRecorder()
-	hr := &http.Request{
-		Method: method,
-		URL: &url.URL{
-			Path: "/",
-		},
-	}
-	mux.Handler(
-		method,
-		hr.URL.Path,
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write(body)
-		}))
-	mux.ServeHTTP(hw, hr)
-	ensure.DeepEqual(t, hw.Body.Bytes(), body)
-}
-
-func TestHTTPHandlerFunc(t *testing.T) {
-	mux, err := ctxmux.New()
-	ensure.Nil(t, err)
-	const method = "FOO"
-	body := []byte("body")
-	hw := httptest.NewRecorder()
-	hr := &http.Request{
-		Method: method,
-		URL: &url.URL{
-			Path: "/",
-		},
-	}
-	mux.HandlerFunc(
-		method, hr.URL.Path, func(w http.ResponseWriter, r *http.Request) {
-			w.Write(body)
-		})
 	mux.ServeHTTP(hw, hr)
 	ensure.DeepEqual(t, hw.Body.Bytes(), body)
 }
