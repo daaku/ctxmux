@@ -1,6 +1,7 @@
 package ctxmux_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +11,6 @@ import (
 	"github.com/daaku/ctxmux"
 	"github.com/facebookgo/ensure"
 	"github.com/julienschmidt/httprouter"
-	"golang.org/x/net/context"
 )
 
 func TestContextWithNoParams(t *testing.T) {
@@ -34,7 +34,7 @@ func TestHTTPHandler(t *testing.T) {
 		actualW = w
 		actualR = r
 	}))
-	ensure.Nil(t, h(nil, w, r))
+	ensure.Nil(t, h(w, r))
 	ensure.DeepEqual(t, actualW, w)
 	ensure.DeepEqual(t, actualR, r)
 }
@@ -48,7 +48,7 @@ func TestHTTPHandlerFunc(t *testing.T) {
 		actualW = w
 		actualR = r
 	})
-	ensure.Nil(t, h(nil, w, r))
+	ensure.Nil(t, h(w, r))
 	ensure.DeepEqual(t, actualW, w)
 	ensure.DeepEqual(t, actualR, r)
 }
@@ -81,9 +81,8 @@ func TestWrapMethods(t *testing.T) {
 	body := []byte("body")
 	for _, c := range cases {
 		mux, err := ctxmux.New(
-			ctxmux.MuxContextMaker(func(r *http.Request) (context.Context, error) {
-				ctx := context.Background()
-				return context.WithValue(ctx, key, val), nil
+			ctxmux.MuxContextChanger(func(r *http.Request) (*http.Request, error) {
+				return r.WithContext(context.WithValue(r.Context(), key, val)), nil
 			}),
 		)
 		ensure.Nil(t, err)
@@ -94,8 +93,8 @@ func TestWrapMethods(t *testing.T) {
 				Path: "/",
 			},
 		}
-		c.Register(mux, hr.URL.Path, func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-			ensure.DeepEqual(t, ctx.Value(key), val)
+		c.Register(mux, hr.URL.Path, func(w http.ResponseWriter, r *http.Request) error {
+			ensure.DeepEqual(t, r.Context().Value(key), val)
 			w.Write(body)
 			return nil
 		})
@@ -108,12 +107,11 @@ func TestMuxContextMakerError(t *testing.T) {
 	givenErr := errors.New("")
 	var actualErr error
 	mux, err := ctxmux.New(
-		ctxmux.MuxContextMaker(func(r *http.Request) (context.Context, error) {
+		ctxmux.MuxContextChanger(func(r *http.Request) (*http.Request, error) {
 			return nil, givenErr
 		}),
 		ctxmux.MuxErrorHandler(
-			func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
-				ensure.DeepEqual(t, ctx, context.Background())
+			func(w http.ResponseWriter, r *http.Request, err error) {
 				actualErr = err
 			}),
 	)
@@ -125,7 +123,7 @@ func TestMuxContextMakerError(t *testing.T) {
 			Path: "/",
 		},
 	}
-	mux.GET(hr.URL.Path, func(context.Context, http.ResponseWriter, *http.Request) error {
+	mux.GET(hr.URL.Path, func(http.ResponseWriter, *http.Request) error {
 		panic("not reached")
 	})
 	mux.ServeHTTP(hw, hr)
@@ -144,7 +142,7 @@ func TestHandleCustomMethod(t *testing.T) {
 			Path: "/",
 		},
 	}
-	mux.Handler(method, hr.URL.Path, func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	mux.Handler(method, hr.URL.Path, func(w http.ResponseWriter, r *http.Request) error {
 		w.Write(body)
 		return nil
 	})
@@ -157,7 +155,7 @@ func TestHandlerReturnErr(t *testing.T) {
 	var actualErr error
 	mux, err := ctxmux.New(
 		ctxmux.MuxErrorHandler(
-			func(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
+			func(w http.ResponseWriter, r *http.Request, err error) {
 				actualErr = err
 			}),
 	)
@@ -169,7 +167,7 @@ func TestHandlerReturnErr(t *testing.T) {
 			Path: "/",
 		},
 	}
-	mux.GET(hr.URL.Path, func(context.Context, http.ResponseWriter, *http.Request) error {
+	mux.GET(hr.URL.Path, func(http.ResponseWriter, *http.Request) error {
 		return givenErr
 	})
 	mux.ServeHTTP(hw, hr)
@@ -180,7 +178,7 @@ func TestHandlerPanic(t *testing.T) {
 	var actualPanic interface{}
 	mux, err := ctxmux.New(
 		ctxmux.MuxPanicHandler(
-			func(ctx context.Context, w http.ResponseWriter, r *http.Request, v interface{}) {
+			func(w http.ResponseWriter, r *http.Request, v interface{}) {
 				actualPanic = v
 			}),
 	)
@@ -193,7 +191,7 @@ func TestHandlerPanic(t *testing.T) {
 		},
 	}
 	givenPanic := int(42)
-	mux.GET(hr.URL.Path, func(context.Context, http.ResponseWriter, *http.Request) error {
+	mux.GET(hr.URL.Path, func(http.ResponseWriter, *http.Request) error {
 		panic(givenPanic)
 	})
 	mux.ServeHTTP(hw, hr)
@@ -203,7 +201,7 @@ func TestHandlerPanic(t *testing.T) {
 func TestHandlerNoPanic(t *testing.T) {
 	mux, err := ctxmux.New(
 		ctxmux.MuxPanicHandler(
-			func(ctx context.Context, w http.ResponseWriter, r *http.Request, v interface{}) {
+			func(w http.ResponseWriter, r *http.Request, v interface{}) {
 				panic("not reached")
 			}),
 	)
@@ -215,7 +213,7 @@ func TestHandlerNoPanic(t *testing.T) {
 			Path: "/",
 		},
 	}
-	mux.GET(hr.URL.Path, func(context.Context, http.ResponseWriter, *http.Request) error {
+	mux.GET(hr.URL.Path, func(http.ResponseWriter, *http.Request) error {
 		return nil
 	})
 	mux.ServeHTTP(hw, hr)
@@ -225,7 +223,7 @@ func TestHandlerNotFound(t *testing.T) {
 	var called bool
 	mux, err := ctxmux.New(
 		ctxmux.MuxNotFoundHandler(
-			func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+			func(w http.ResponseWriter, r *http.Request) error {
 				called = true
 				return nil
 			}),
@@ -252,7 +250,7 @@ func TestRedirectTrailingSlash(t *testing.T) {
 			Path: "/foo",
 		},
 	}
-	mux.GET(hr.URL.Path+"/", func(context.Context, http.ResponseWriter, *http.Request) error {
+	mux.GET(hr.URL.Path+"/", func(http.ResponseWriter, *http.Request) error {
 		return nil
 	})
 	mux.ServeHTTP(hw, hr)
