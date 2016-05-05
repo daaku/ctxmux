@@ -103,7 +103,7 @@ func TestWrapMethods(t *testing.T) {
 	}
 }
 
-func TestMuxContextMakerError(t *testing.T) {
+func TestMuxContextChangerError(t *testing.T) {
 	givenErr := errors.New("")
 	var actualErr error
 	mux, err := ctxmux.New(
