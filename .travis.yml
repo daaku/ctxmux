@@ -4,7 +4,6 @@ go:
   - tip
 
 before_install:
-  - go get -v golang.org/x/tools/cmd/vet
   - go get -v golang.org/x/tools/cmd/cover
   - go get -v github.com/golang/lint/golint
 
