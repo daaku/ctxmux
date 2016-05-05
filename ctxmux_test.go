@@ -257,3 +257,22 @@ func TestRedirectTrailingSlash(t *testing.T) {
 	ensure.DeepEqual(t, hw.Header().Get("Location"), hr.URL.Path)
 	ensure.DeepEqual(t, hw.Code, http.StatusMovedPermanently)
 }
+
+func TestWithParams(t *testing.T) {
+	mux, err := ctxmux.New()
+	ensure.Nil(t, err)
+	hw := httptest.NewRecorder()
+	hr := &http.Request{
+		Method: "GET",
+		URL: &url.URL{
+			Path: "/foo/",
+		},
+	}
+	mux.GET("/:name/", func(w http.ResponseWriter, r *http.Request) error {
+		ensure.DeepEqual(t, ctxmux.ContextParams(r.Context()), httprouter.Params{
+			{Key: "name", Value: "foo"},
+		})
+		return nil
+	})
+	mux.ServeHTTP(hw, hr)
+}
